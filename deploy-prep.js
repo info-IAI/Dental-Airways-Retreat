@@ -3,7 +3,7 @@
  * IAI Deploy Prep Script
  * ----------------------
  * Run this after every Claude Design export to produce a clean,
- * mobile-safe, Netlify-ready index.html with the registration
+ * mobile-safe, GitHub/Netlify-ready index.html with the registration
  * form already embedded.
  *
  * Usage (from your site folder in Claude Code terminal):
@@ -21,6 +21,16 @@
  *   6. Replaces the #register section with the full two-step form
  *   7. Updates title, meta tags, favicon to IAI branding
  *   8. Writes the clean file back to index.html
+ *
+ * DEPLOY WORKFLOW (updated — this repo is now connected to Netlify via GitHub):
+ *   The site no longer deploys by dragging a folder into Netlify. Netlify
+ *   auto-deploys from the "info-IAI/Dental-Airways-Retreat" GitHub repo on
+ *   every push to main. This matters because netlify.toml (which points to
+ *   the Helcim serverless function) is only read on Git-based deploys — a
+ *   drag-and-drop deploy silently skips it and breaks the payment modal.
+ *   After this script finishes, commit and push your changes with Git
+ *   instead of dragging the folder into Netlify. See the printed
+ *   instructions at the end of this script for the exact commands.
  */
 
 const fs   = require('fs');
@@ -32,7 +42,7 @@ const INPUT  = path.join(__dirname, 'index.html');
 const OUTPUT = path.join(__dirname, 'index.html');
 
 // Apps Script URL — paste your deployed web app URL here when ready to go live
-const APPS_SCRIPT_URL = 'YOUR_APPS_SCRIPT_URL_HERE';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz6BruqNqhwjXLT3dJvBUrxOmUKccXb3Xb5sd792dokROMYAqo7jLKDYmaBF72taxSw/exec';
 
 // Helcim payment page URL
 const HELCIM_URL = 'https://integrated-airway-institute.myhelcim.com/hosted/?token=1ea1697203da249c458414&amount=6100.00&amountHash=0185ad391883b4d8ccf456bb9bd13e5e5cc4652de6081640393d84038c68fedc';
@@ -170,11 +180,20 @@ const REGISTER_SECTION = `
         <!-- Step 2: Summary + payment -->
         <div id="reg-panel-2" style="display: none; max-width: 560px">
           <div id="reg-summary" style="background: color-mix(in srgb, var(--color-text) 5%, transparent); border: 1px solid color-mix(in srgb, var(--color-text) 14%, transparent); border-radius: 8px; padding: 20px 24px; margin-bottom: 24px; font-size: 14px; line-height: 1.7"></div>
+
           <div style="border: 1px solid color-mix(in srgb, var(--color-accent) 35%, transparent); border-radius: 8px; padding: 16px 20px; margin-bottom: 24px; font-size: 14px; color: color-mix(in srgb, var(--color-text) 78%, transparent); background: color-mix(in srgb, var(--color-accent) 7%, transparent)">
-            After submitting your information, you will be taken to our secure payment page to complete your $6,100 registration by credit card or ACH bank transfer. A seat confirmation email will follow once payment is received.
+            Complete your $6,100 registration securely by credit card or ACH bank transfer. Your information has already been saved. A seat confirmation email will follow once payment clears.
           </div>
-          <button class="btn btn-primary" id="reg-pay-btn" onclick="regGoToPayment()" style="width: 100%; font-size: 16px; padding: 14px">Submit and go to payment — $6,100</button>
-          <div style="height: 14px"></div>
+
+          <!-- Payment error message -->
+          <div id="reg-pay-error" style="display: none; border: 1px solid #c0392b; border-radius: 8px; padding: 14px 18px; margin-bottom: 18px; font-size: 14px; color: #c0392b; background: rgba(192,57,43,0.06)"></div>
+
+          <button class="btn btn-primary" id="reg-pay-btn" onclick="regGoToPayment()" style="width: 100%; font-size: 16px; padding: 14px">
+            <span id="reg-pay-btn-label">Pay $6,100 — credit card or ACH</span>
+          </button>
+          <p style="font-size: 12px; text-align: center; margin: 10px 0 18px; color: color-mix(in srgb, var(--color-text) 45%, transparent)">
+            Processed securely by Helcim &nbsp;·&nbsp; Card data never touches this site
+          </p>
           <button class="btn btn-ghost" onclick="regGoBack()" style="width: 100%; font-size: 14px">Edit your information</button>
         </div>
 
@@ -184,8 +203,8 @@ const REGISTER_SECTION = `
             <circle cx="24" cy="24" r="20" stroke-opacity="0.3"></circle>
             <polyline points="15,24 21,30 33,18"></polyline>
           </svg>
-          <h3 style="font-family: var(--font-heading); font-size: 24px; font-weight: var(--font-heading-weight); margin: 0 0 10px">Information received</h3>
-          <p style="font-size: 15px; line-height: 1.65; color: color-mix(in srgb, var(--color-text) 72%, transparent); max-width: 38ch; margin: 0 auto">Complete your payment in the tab that just opened. A seat confirmation email will follow once payment clears.</p>
+          <h3 style="font-family: var(--font-heading); font-size: 24px; font-weight: var(--font-heading-weight); margin: 0 0 10px">Payment received</h3>
+          <p style="font-size: 15px; line-height: 1.65; color: color-mix(in srgb, var(--color-text) 72%, transparent); max-width: 38ch; margin: 0 auto">Thank you — your payment has been received. A seat confirmation email will follow shortly.</p>
           <p style="margin-top: 20px; font-size: 13px; color: color-mix(in srgb, var(--color-text) 48%, transparent)">Questions? <a href="mailto:info@integratedairwayinstitute.com">info@integratedairwayinstitute.com</a></p>
         </div>
       </div>
@@ -195,7 +214,7 @@ const REGISTER_SECTION = `
         #register .field label { font-size: 13px; font-weight: 500; color: color-mix(in srgb, var(--color-text) 75%, transparent); }
         #register .input { width: 100%; box-sizing: border-box; background: color-mix(in srgb, var(--color-text) 5%, transparent); border: 1px solid color-mix(in srgb, var(--color-text) 18%, transparent); border-radius: 6px; padding: 10px 12px; font-size: 15px; color: var(--color-text); font-family: var(--font-body); transition: border-color 0.15s; }
         #register .input:focus { outline: none; border-color: var(--color-accent); }
-        #register select.input option { background: #1a1a1a; color: #fff; }
+        #register select.input option { background: var(--color-surface); color: var(--color-text); }
         #register textarea.input { font-family: var(--font-body); }
         #register .summary-row { display: flex; justify-content: space-between; padding: 3px 0; }
         #register .summary-row .slabel { color: color-mix(in srgb, var(--color-text) 55%, transparent); }
@@ -207,7 +226,7 @@ const REGISTER_SECTION = `
 
       <script>
         var APPS_SCRIPT_URL = '__APPS_SCRIPT_URL__';
-        var HELCIM_URL = '__HELCIM_URL__';
+        var _regCheckoutToken = null;
 
         function regGetVal(id) { return document.getElementById(id).value.trim(); }
         function regShowError(id, show) { var el = document.getElementById('err-' + id); if (el) el.style.display = show ? 'block' : 'none'; }
@@ -218,12 +237,12 @@ const REGISTER_SECTION = `
           regClearErrors();
           var valid = true;
           var checks = [
-            { id: 'reg-first', fn: function(v) { return v.length > 0; } },
-            { id: 'reg-last',  fn: function(v) { return v.length > 0; } },
-            { id: 'reg-email', fn: function(v) { return regValidEmail(v); } },
-            { id: 'reg-phone', fn: function(v) { return v.length > 0; } },
-            { id: 'reg-city',  fn: function(v) { return v.length > 0; } },
-            { id: 'reg-state', fn: function(v) { return v.length > 0; } },
+            { id: 'reg-first',     fn: function(v) { return v.length > 0; } },
+            { id: 'reg-last',      fn: function(v) { return v.length > 0; } },
+            { id: 'reg-email',     fn: function(v) { return regValidEmail(v); } },
+            { id: 'reg-phone',     fn: function(v) { return v.length > 0; } },
+            { id: 'reg-city',      fn: function(v) { return v.length > 0; } },
+            { id: 'reg-state',     fn: function(v) { return v.length > 0; } },
             { id: 'reg-specialty', fn: function(v) { return v.length > 0; } }
           ];
           checks.forEach(function(c) { if (!c.fn(regGetVal(c.id))) { regShowError(c.id, true); valid = false; } });
@@ -237,7 +256,9 @@ const REGISTER_SECTION = `
             { label: 'Location',  value: regGetVal('reg-city') + ', ' + regGetVal('reg-state') },
             { label: 'Specialty', value: regGetVal('reg-specialty') }
           ];
-          var html = rows.map(function(r) { return '<div class="summary-row"><span class="slabel">' + r.label + '</span><span class="svalue">' + r.value + '</span></div>'; }).join('') + '<div class="summary-total"><span class="slabel">Total due</span><span class="svalue">$6,100</span></div>';
+          var html = rows.map(function(r) {
+            return '<div class="summary-row"><span class="slabel">' + r.label + '</span><span class="svalue">' + r.value + '</span></div>';
+          }).join('') + '<div class="summary-total"><span class="slabel">Total due</span><span class="svalue">$6,100</span></div>';
           document.getElementById('reg-summary').innerHTML = html;
 
           document.getElementById('reg-panel-1').style.display = 'none';
@@ -251,6 +272,9 @@ const REGISTER_SECTION = `
           document.getElementById('reg-lbl-1').style.color = 'color-mix(in srgb, var(--color-text) 50%, transparent)';
           document.getElementById('reg-lbl-2').style.color = 'var(--color-accent)';
           document.getElementById('reg-panel-2').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+          /* Pre-fetch checkout token in background so it's ready when they click Pay */
+          regFetchCheckoutToken();
         }
 
         function regGoBack() {
@@ -265,30 +289,106 @@ const REGISTER_SECTION = `
           document.getElementById('reg-lbl-1').style.color = 'var(--color-accent)';
           document.getElementById('reg-lbl-2').style.color = 'color-mix(in srgb, var(--color-text) 40%, transparent)';
           document.getElementById('reg-panel-1').scrollIntoView({ behavior: 'smooth', block: 'start' });
+          _regCheckoutToken = null;
+        }
+
+        function regFetchCheckoutToken() {
+          _regCheckoutToken = null;
+          fetch('/.netlify/functions/helcim-init', { method: 'POST' })
+            .then(function(res) { return res.json(); })
+            .then(function(data) { if (data.checkoutToken) { _regCheckoutToken = data.checkoutToken; } })
+            .catch(function() { /* silent — will retry on click */ });
+        }
+
+        function regSetPayBtn(loading) {
+          var btn = document.getElementById('reg-pay-btn');
+          var lbl = document.getElementById('reg-pay-btn-label');
+          btn.disabled = loading;
+          lbl.textContent = loading ? 'Opening payment…' : 'Pay $6,100 — credit card or ACH';
+        }
+
+        function regShowPayError(msg) {
+          var el = document.getElementById('reg-pay-error');
+          el.textContent = msg;
+          el.style.display = 'block';
+        }
+
+        function regClearPayError() {
+          document.getElementById('reg-pay-error').style.display = 'none';
         }
 
         function regGoToPayment() {
-          var data = {
-            'First Name':    regGetVal('reg-first'),
-            'Last Name':     regGetVal('reg-last'),
-            'Email Address': regGetVal('reg-email'),
-            'Phone Number':  regGetVal('reg-phone'),
-            'Practice Name': regGetVal('reg-practice'),
-            'City':          regGetVal('reg-city'),
-            'State':         regGetVal('reg-state'),
-            'Dental Specialty': regGetVal('reg-specialty'),
+          regClearPayError();
+
+          /* Post registration data to Apps Script */
+          var formData = {
+            'First Name':               regGetVal('reg-first'),
+            'Last Name':                regGetVal('reg-last'),
+            'Email Address':            regGetVal('reg-email'),
+            'Phone Number':             regGetVal('reg-phone'),
+            'Practice Name':            regGetVal('reg-practice'),
+            'City':                     regGetVal('reg-city'),
+            'State':                    regGetVal('reg-state'),
+            'Dental Specialty':         regGetVal('reg-specialty'),
             'How did you hear about us?': regGetVal('reg-hear'),
-            'Questions or Comments': regGetVal('reg-questions')
+            'Questions or Comments':    regGetVal('reg-questions')
           };
           if (APPS_SCRIPT_URL !== 'YOUR_APPS_SCRIPT_URL_HERE') {
-            fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }).catch(function() {});
+            fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formData) }).catch(function() {});
           }
-          window.open(HELCIM_URL, '_blank');
+
+          /* Use pre-fetched token or fetch now */
+          if (_regCheckoutToken) {
+            regLaunchHelcimModal(_regCheckoutToken);
+          } else {
+            regSetPayBtn(true);
+            fetch('/.netlify/functions/helcim-init', { method: 'POST' })
+              .then(function(res) { return res.json(); })
+              .then(function(data) {
+                regSetPayBtn(false);
+                if (data.checkoutToken) {
+                  regLaunchHelcimModal(data.checkoutToken);
+                } else {
+                  regShowPayError(data.error || 'Unable to initialize payment. Please try again or email info@integratedairwayinstitute.com.');
+                }
+              })
+              .catch(function() {
+                regSetPayBtn(false);
+                regShowPayError('Unable to reach payment service. Please check your connection and try again, or email info@integratedairwayinstitute.com.');
+              });
+          }
+        }
+
+        function regLaunchHelcimModal(checkoutToken) {
+          window.addEventListener('message', function regHelcimListener(event) {
+            var key = 'helcim-pay-js-' + checkoutToken;
+            if (event.data && event.data.eventName === key) {
+              window.removeEventListener('message', regHelcimListener);
+              if (typeof removeHelcimPayIframe === 'function') { removeHelcimPayIframe(); }
+              if (event.data.eventStatus === 'SUCCESS') {
+                regShowConfirmation();
+              } else if (event.data.eventStatus === 'ABORTED') {
+                regShowPayError('Payment was cancelled. You can try again below.');
+                _regCheckoutToken = null;
+                regFetchCheckoutToken();
+              }
+            }
+          });
+          if (typeof appendHelcimPayIframe === 'function') {
+            appendHelcimPayIframe(checkoutToken);
+          } else {
+            regShowPayError('Payment script did not load. Please refresh the page and try again.');
+          }
+        }
+
+        function regShowConfirmation() {
           document.getElementById('reg-panel-2').style.display = 'none';
           document.getElementById('reg-steps').style.display = 'none';
           document.getElementById('reg-panel-confirm').style.display = 'block';
+          document.getElementById('reg-panel-confirm').scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
       </script>
+
     </section>
 `;
 
@@ -417,7 +517,14 @@ fs.writeFileSync(OUTPUT, html, 'utf8');
 console.log('Done. Changes applied:\n');
 changes.forEach(c => console.log('  ✓ ' + c));
 console.log('\nOutput: index.html');
-console.log('\nNext step: drag your site folder into Netlify → Production deploys.');
+console.log('\nNext step — this site deploys from GitHub now, not drag-and-drop:');
+console.log('  1. git add -A');
+console.log('  2. git commit -m "Update site content"');
+console.log('  3. git push');
+console.log('  4. Check the Deploys tab in Netlify and wait for "Published"');
+console.log('\n(Dragging the folder into Netlify still works for quick previews, but the');
+console.log(' Helcim payment function only loads on a Git-based deploy, so a drag-and-drop');
+console.log(' deploy will look fine and then silently break the payment modal.)');
 if (APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_URL_HERE') {
   console.log('\n⚠  APPS_SCRIPT_URL is still a placeholder.');
   console.log('   Open deploy-prep.js and paste your real URL before going live.');

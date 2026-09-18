@@ -1,0 +1,16 @@
+# Local dev tooling (not part of the deployed site)
+.claude/
+
+# Local backups made while testing changes
+index.html.bak-*
+
+# Staging folders created when unzipping a fresh Claude Design export for review
+_new-export/
+
+# Raw Claude Design export archives — already extracted into uploads/ and index.html
+*.zip
+
+# Local-only reference/working files — not site content
+IAI_Certificate_TEMPLATE.pptx
+landing-page-full.png
+Images - Unused/
