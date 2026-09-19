@@ -613,7 +613,7 @@ textarea.input{min-height:90px;resize:vertical}
       </style>
 
       <script>
-        var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz6BruqNqhwjXLT3dJvBUrxOmUKccXb3Xb5sd792dokROMYAqo7jLKDYmaBF72taxSw/exec';
+        var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzmqeVW5tHfEgMvC2pdASQEgbEWm8SjuWHqBoUvRxXATCUf0HwRjaXrjsewWxNdDit4/exec';
         var _regCheckoutToken = null;
 
         function regGetVal(id) { return document.getElementById(id).value.trim(); }
@@ -755,7 +755,7 @@ textarea.input{min-height:90px;resize:vertical}
               if (typeof removeHelcimPayIframe === 'function') { removeHelcimPayIframe(); }
               if (event.data.eventStatus === 'SUCCESS') {
                 regShowConfirmation();
-              } else if (event.data.eventStatus === 'ABORTED') {
+              } else if (event.data.eventStatus === 'ABORTED' || event.data.eventStatus === 'HIDE') {
                 regShowPayError('Payment was cancelled. You can try again below.');
                 _regCheckoutToken = null;
                 regFetchCheckoutToken();

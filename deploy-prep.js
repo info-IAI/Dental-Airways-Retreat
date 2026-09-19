@@ -42,7 +42,7 @@ const INPUT  = path.join(__dirname, 'index.html');
 const OUTPUT = path.join(__dirname, 'index.html');
 
 // Apps Script URL — paste your deployed web app URL here when ready to go live
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz6BruqNqhwjXLT3dJvBUrxOmUKccXb3Xb5sd792dokROMYAqo7jLKDYmaBF72taxSw/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzmqeVW5tHfEgMvC2pdASQEgbEWm8SjuWHqBoUvRxXATCUf0HwRjaXrjsewWxNdDit4/exec';
 
 // Helcim payment page URL
 const HELCIM_URL = 'https://integrated-airway-institute.myhelcim.com/hosted/?token=1ea1697203da249c458414&amount=6100.00&amountHash=0185ad391883b4d8ccf456bb9bd13e5e5cc4652de6081640393d84038c68fedc';
@@ -367,7 +367,7 @@ const REGISTER_SECTION = `
               if (typeof removeHelcimPayIframe === 'function') { removeHelcimPayIframe(); }
               if (event.data.eventStatus === 'SUCCESS') {
                 regShowConfirmation();
-              } else if (event.data.eventStatus === 'ABORTED') {
+              } else if (event.data.eventStatus === 'ABORTED' || event.data.eventStatus === 'HIDE') {
                 regShowPayError('Payment was cancelled. You can try again below.');
                 _regCheckoutToken = null;
                 regFetchCheckoutToken();
