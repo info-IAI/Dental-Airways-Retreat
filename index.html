@@ -570,6 +570,33 @@ textarea.input{min-height:90px;resize:vertical}
         <div id="reg-panel-2" style="display: none; max-width: 560px">
           <div id="reg-summary" style="background: color-mix(in srgb, var(--color-text) 5%, transparent); border: 1px solid color-mix(in srgb, var(--color-text) 14%, transparent); border-radius: 8px; padding: 20px 24px; margin-bottom: 24px; font-size: 14px; line-height: 1.7"></div>
 
+          <!-- Payment plan choice -->
+          <div style="margin-bottom: 24px">
+            <label style="font-size: 13px; font-weight: 500; color: color-mix(in srgb, var(--color-text) 75%, transparent); display: block; margin-bottom: 10px">How would you like to pay?</label>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px">
+              <button type="button" id="reg-plan-full" onclick="regSelectPlan('full')" class="plan-selected"
+                style="text-align: left; padding: 14px 16px; border-radius: 8px; border: 1px solid color-mix(in srgb, var(--color-text) 18%, transparent); background: color-mix(in srgb, var(--color-text) 4%, transparent); cursor: pointer; font-family: var(--font-body)">
+                <div style="font-weight: 600; font-size: 14px; margin-bottom: 3px">Pay in full</div>
+                <div style="font-size: 13px; color: color-mix(in srgb, var(--color-text) 60%, transparent)">$6,100 today</div>
+              </button>
+
+              <button type="button" id="reg-plan-deposit" onclick="regSelectPlan('deposit')"
+                style="text-align: left; padding: 14px 16px; border-radius: 8px; border: 1px solid color-mix(in srgb, var(--color-text) 18%, transparent); background: color-mix(in srgb, var(--color-text) 4%, transparent); cursor: pointer; font-family: var(--font-body)">
+                <div style="font-weight: 600; font-size: 14px; margin-bottom: 3px">Split into two payments</div>
+                <div style="font-size: 13px; color: color-mix(in srgb, var(--color-text) 60%, transparent)">$3,050 now, $3,050 by Feb 11, 2027</div>
+              </button>
+            </div>
+          </div>
+
+          <!-- Consent box — only visible when Split is selected -->
+          <div id="reg-consent-box" style="display: none; border: 1px solid color-mix(in srgb, var(--color-accent) 35%, transparent); border-radius: 8px; padding: 16px 18px; margin-bottom: 24px; background: color-mix(in srgb, var(--color-accent) 6%, transparent)">
+            <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer; font-size: 13px; line-height: 1.6; color: color-mix(in srgb, var(--color-text) 80%, transparent)">
+              <input type="checkbox" id="reg-consent-checkbox" onchange="regOnConsentChange()" style="margin-top: 3px; flex-shrink: 0">
+              <span>By selecting Split Payment, you authorize Integrated Airway Institute to automatically charge the remaining balance of $3,050 to the payment method used today. This charge will occur on or shortly after February 11, 2027, if the balance has not already been paid. This automatic charge is non-refundable, per our Cancellation &amp; Refund Policy. If your payment method changes before then, please contact us at info@integratedairwayinstitute.com.</span>
+            </label>
+          </div>
+
           <div style="border: 1px solid color-mix(in srgb, var(--color-accent) 35%, transparent); border-radius: 8px; padding: 16px 20px; margin-bottom: 24px; font-size: 14px; color: color-mix(in srgb, var(--color-text) 78%, transparent); background: color-mix(in srgb, var(--color-accent) 7%, transparent)">
             Complete your $6,100 registration securely by credit card or ACH bank transfer. Your information has already been saved. A seat confirmation email will follow once payment clears.
           </div>
@@ -611,11 +638,14 @@ textarea.input{min-height:90px;resize:vertical}
         #register .summary-total { display: flex; justify-content: space-between; border-top: 1px solid color-mix(in srgb, var(--color-text) 18%, transparent); margin-top: 10px; padding-top: 12px; font-size: 16px; }
         #register .summary-total .slabel { font-weight: 500; }
         #register .summary-total .svalue { color: var(--color-accent); font-weight: 600; }
+        #register .plan-selected { border-color: var(--color-accent) !important; background: color-mix(in srgb, var(--color-accent) 10%, transparent) !important; }
       </style>
 
       <script>
         var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzmqeVW5tHfEgMvC2pdASQEgbEWm8SjuWHqBoUvRxXATCUf0HwRjaXrjsewWxNdDit4/exec';
         var _regCheckoutToken = null;
+        var _regSecretToken = null;
+        var _regSelectedPlan = 'full'; // 'full' or 'deposit', defaults to full
 
         function regGetVal(id) { return document.getElementById(id).value.trim(); }
         function regShowError(id, show) { var el = document.getElementById('err-' + id); if (el) el.style.display = show ? 'block' : 'none'; }
@@ -681,11 +711,64 @@ textarea.input{min-height:90px;resize:vertical}
           _regCheckoutToken = null;
         }
 
+        function regSelectPlan(planType) {
+          _regSelectedPlan = planType;
+
+          var fullBtn = document.getElementById('reg-plan-full');
+          var depositBtn = document.getElementById('reg-plan-deposit');
+          var consentBox = document.getElementById('reg-consent-box');
+          var payBtnLabel = document.getElementById('reg-pay-btn-label');
+          var payBtn = document.getElementById('reg-pay-btn');
+          var consentCheckbox = document.getElementById('reg-consent-checkbox');
+
+          if (planType === 'full') {
+            fullBtn.classList.add('plan-selected');
+            depositBtn.classList.remove('plan-selected');
+            consentBox.style.display = 'none';
+            payBtnLabel.textContent = 'Pay $6,100 — credit card or ACH';
+            payBtn.disabled = false;
+          } else {
+            depositBtn.classList.add('plan-selected');
+            fullBtn.classList.remove('plan-selected');
+            consentBox.style.display = 'block';
+            payBtnLabel.textContent = 'Pay $3,050 now — credit card or ACH';
+            // Split plan requires the consent checkbox before the button unlocks
+            payBtn.disabled = !consentCheckbox.checked;
+          }
+
+          // Plan changed, so any pre-fetched token is for the wrong amount now
+          _regCheckoutToken = null;
+          _regSecretToken = null;
+          regFetchCheckoutToken();
+        }
+
+        function regOnConsentChange() {
+          var consentCheckbox = document.getElementById('reg-consent-checkbox');
+          var payBtn = document.getElementById('reg-pay-btn');
+          if (_regSelectedPlan === 'deposit') {
+            payBtn.disabled = !consentCheckbox.checked;
+          }
+        }
+
         function regFetchCheckoutToken() {
           _regCheckoutToken = null;
-          fetch('/.netlify/functions/helcim-init', { method: 'POST' })
+          _regSecretToken = null;
+          fetch('/.netlify/functions/helcim-init', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              planType: _regSelectedPlan,
+              fullName: regGetVal('reg-first') + ' ' + regGetVal('reg-last'),
+              email: regGetVal('reg-email')
+            })
+          })
             .then(function(res) { return res.json(); })
-            .then(function(data) { if (data.checkoutToken) { _regCheckoutToken = data.checkoutToken; } })
+            .then(function(data) {
+              if (data.checkoutToken) {
+                _regCheckoutToken = data.checkoutToken;
+                _regSecretToken = data.secretToken;
+              }
+            })
             .catch(function() { /* silent — will retry on click */ });
         }
 
@@ -709,7 +792,6 @@ textarea.input{min-height:90px;resize:vertical}
         function regGoToPayment() {
           regClearPayError();
 
-          /* Post registration data to Apps Script */
           var formData = {
             'First Name':               regGetVal('reg-first'),
             'Last Name':                regGetVal('reg-last'),
@@ -720,22 +802,31 @@ textarea.input{min-height:90px;resize:vertical}
             'State':                    regGetVal('reg-state'),
             'Dental Specialty':         regGetVal('reg-specialty'),
             'How did you hear about us?': regGetVal('reg-hear'),
-            'Questions or Comments':    regGetVal('reg-questions')
+            'Questions or Comments':    regGetVal('reg-questions'),
+            'Payment Plan':             _regSelectedPlan === 'deposit' ? 'Split' : 'Full'
           };
           if (APPS_SCRIPT_URL !== 'YOUR_APPS_SCRIPT_URL_HERE') {
             fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formData) }).catch(function() {});
           }
 
-          /* Use pre-fetched token or fetch now */
           if (_regCheckoutToken) {
             regLaunchHelcimModal(_regCheckoutToken);
           } else {
             regSetPayBtn(true);
-            fetch('/.netlify/functions/helcim-init', { method: 'POST' })
+            fetch('/.netlify/functions/helcim-init', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                planType: _regSelectedPlan,
+                fullName: regGetVal('reg-first') + ' ' + regGetVal('reg-last'),
+                email: regGetVal('reg-email')
+              })
+            })
               .then(function(res) { return res.json(); })
               .then(function(data) {
                 regSetPayBtn(false);
                 if (data.checkoutToken) {
+                  _regSecretToken = data.secretToken;
                   regLaunchHelcimModal(data.checkoutToken);
                 } else {
                   regShowPayError(data.error || 'Unable to initialize payment. Please try again or email info@integratedairwayinstitute.com.');
@@ -755,10 +846,12 @@ textarea.input{min-height:90px;resize:vertical}
               window.removeEventListener('message', regHelcimListener);
               if (typeof removeHelcimPayIframe === 'function') { removeHelcimPayIframe(); }
               if (event.data.eventStatus === 'SUCCESS') {
+                regValidateAndRecordDeposit(event.data.eventMessage.data, event.data.eventMessage.hash);
                 regShowConfirmation();
               } else if (event.data.eventStatus === 'ABORTED' || event.data.eventStatus === 'HIDE') {
                 regShowPayError('Payment was cancelled. You can try again below.');
                 _regCheckoutToken = null;
+                _regSecretToken = null;
                 regFetchCheckoutToken();
               }
             }
@@ -768,6 +861,50 @@ textarea.input{min-height:90px;resize:vertical}
           } else {
             regShowPayError('Payment script did not load. Please refresh the page and try again.');
           }
+        }
+
+        function regValidateAndRecordDeposit(rawDataResponse, hash) {
+          if (_regSelectedPlan !== 'deposit') { return; } // nothing to record for a full payment
+
+          fetch('/.netlify/functions/helcim-validate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              rawDataResponse: rawDataResponse,
+              hash: hash,
+              secretToken: _regSecretToken
+            })
+          })
+            .then(function(res) { return res.json(); })
+            .then(function(validation) {
+              if (APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_URL_HERE') { return; }
+
+              var depositData = {
+                action: 'recordDeposit',
+                'Email Address': regGetVal('reg-email'),
+                'Balance Due': 3050,
+                'Balance Due Date': '2027-02-11',
+                'Customer Code': validation.valid ? (validation.customerCode || '') : '',
+                'Card Token': validation.valid ? (validation.cardToken || '') : '',
+                'Validation Passed': validation.valid ? true : false
+              };
+              fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(depositData) }).catch(function() {});
+            })
+            .catch(function() {
+              // If validation itself fails to even run, still tell Apps Script a
+              // deposit happened so a human can follow up, just without a
+              // trustworthy card reference for the automatic charge.
+              if (APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_URL_HERE') { return; }
+              fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+                action: 'recordDeposit',
+                'Email Address': regGetVal('reg-email'),
+                'Balance Due': 3050,
+                'Balance Due Date': '2027-02-11',
+                'Customer Code': '',
+                'Card Token': '',
+                'Validation Passed': false
+              }) }).catch(function() {});
+            });
         }
 
         function regShowConfirmation() {
