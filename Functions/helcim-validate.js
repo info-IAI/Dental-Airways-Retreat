@@ -74,9 +74,18 @@ exports.handler = async function (event) {
     };
   }
 
+  // TEMPORARY DIAGNOSTIC LOGGING — moved above the missing-fields check,
+  // since the last test returned in ~4ms with nothing logged, meaning it
+  // was very likely exiting AT that check, before reaching any logging.
+  // This placement guarantees we see the raw request no matter what.
+  console.log('helcim-validate raw body received:', JSON.stringify(body));
+
   const { rawDataResponse, hash, secretToken, email } = body;
 
+  console.log('Parsed: rawDataResponse present=' + !!rawDataResponse + ' hash present=' + !!hash + ' secretToken present=' + !!secretToken + ' email present=' + !!email);
+
   if (!rawDataResponse || !hash || !secretToken) {
+    console.log('EXITING EARLY: missing required fields, see above for what was actually received.');
     return {
       statusCode: 400,
       body: JSON.stringify({ error: 'Missing required fields.' })
