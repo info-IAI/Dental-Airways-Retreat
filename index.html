@@ -814,7 +814,27 @@ textarea.input{min-height:90px;resize:vertical}
               window.removeEventListener('message', regHelcimListener);
               if (typeof removeHelcimPayIframe === 'function') { removeHelcimPayIframe(); }
               if (event.data.eventStatus === 'SUCCESS') {
-                regValidateAndRecordDeposit(event.data.eventMessage.data, event.data.eventMessage.hash);
+                // Per Helcim's docs, eventMessage arrives as a JSON.stringify'd
+                // STRING, not an object, it must be parsed before reading .data
+                // and .hash off it. (This was the actual bug behind the
+                // "missing required fields" / empty rawDataResponse+hash issue
+                // found while testing on Sep 26 — event.data.eventMessage.data
+                // was silently undefined because .data doesn't exist on a
+                // plain string.)
+                var parsedEventMessage;
+                try {
+                  parsedEventMessage = typeof event.data.eventMessage === 'string'
+                    ? JSON.parse(event.data.eventMessage)
+                    : event.data.eventMessage;
+                } catch (e) {
+                  parsedEventMessage = null;
+                }
+
+                if (parsedEventMessage && parsedEventMessage.data && parsedEventMessage.hash) {
+                  regValidateAndRecordDeposit(parsedEventMessage.data, parsedEventMessage.hash);
+                } else {
+                  console.error('Could not parse Helcim SUCCESS eventMessage:', event.data.eventMessage);
+                }
                 regShowConfirmation();
               } else if (event.data.eventStatus === 'ABORTED' || event.data.eventStatus === 'HIDE') {
                 regShowPayError('Payment was cancelled. You can try again below.');
