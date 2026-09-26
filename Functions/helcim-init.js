@@ -9,11 +9,20 @@
  * trusted from the client, so nobody can tamper with the browser request
  * to pay $1 for a $6,100 retreat.
  *
- * For EVERY payment (full or deposit), the registrant's name and email are
- * sent to Helcim as a customerRequest, so the Helcim customer record has an
- * email address and Helcim can send the customer their receipt.
- * (Before Sep 24, 2026 this was only done for deposits, which is why the
- * first full payment came through with no email on file.)
+ * SEP 26 REVISION — IMPORTANT:
+ * This function used to also send the registrant's email inside
+ * customerRequest.billingAddress, to get an email attached to the Helcim
+ * customer record. That broke every payment, because Helcim requires
+ * street1 and postalCode whenever billingAddress is present at all, and
+ * our registration form never collects a street address or ZIP.
+ *
+ * The fix: don't send billingAddress here at all. Helcim's own card entry
+ * modal already collects a billing address from the cardholder for AVS
+ * purposes, on every payment, regardless of what we send, so nothing is
+ * lost by leaving it out here. The email now gets attached AFTER a
+ * successful payment instead, by helcim-validate.js, using the address
+ * Helcim already collected during card entry rather than asking the
+ * registrant to type it a second time.
  *
  * For the 'deposit' plan only, the card/bank is also saved as the
  * customer's default payment method, so the remaining balance can be
@@ -25,6 +34,7 @@
  * Endpoint: /.netlify/functions/helcim-init
  * Method: POST
  * Body: { planType: 'full' | 'deposit', fullName: string, email: string }
+ *       (email is accepted but no longer used here — see above)
  * Returns: { checkoutToken, secretToken } on success
  */
 
@@ -77,16 +87,17 @@ exports.handler = async function (event) {
     };
   }
 
-  // Name and email are required for every payment, so every Helcim
-  // customer record has an email address for receipts.
+  // Name is required for every payment, so Helcim's customer record has a
+  // real name attached (this also prepopulates the Cardholder name field
+  // in the payment modal). Email is intentionally NOT required or used
+  // here anymore, see the note at the top of this file.
   const fullName = (body.fullName || '').trim();
-  const email = (body.email || '').trim();
 
-  if (!fullName || !email) {
-    console.error('Missing fullName or email. fullName:', fullName, 'email:', email);
+  if (!fullName) {
+    console.error('Missing fullName.');
     return {
       statusCode: 400,
-      body: JSON.stringify({ error: 'Please go back and enter your full name and email address before paying.' })
+      body: JSON.stringify({ error: 'Please go back and enter your full name before paying.' })
     };
   }
 
@@ -97,14 +108,10 @@ exports.handler = async function (event) {
     paymentMethod: 'cc-ach',
     allowExit: true,
     confirmationScreen: true,
-    // Creates the Helcim customer with name and email. Per Helcim's docs,
-    // a customer's email is stored inside billingAddress, not at the top level.
+    // Deliberately NOT including billingAddress here. See the note at the
+    // top of this file for why.
     customerRequest: {
-      contactName: fullName,
-      billingAddress: {
-        name: fullName,
-        email: email
-      }
+      contactName: fullName
     }
   };
 

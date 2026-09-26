@@ -864,19 +864,23 @@ textarea.input{min-height:90px;resize:vertical}
         }
 
         function regValidateAndRecordDeposit(rawDataResponse, hash) {
-          if (_regSelectedPlan !== 'deposit') { return; } // nothing to record for a full payment
-
+          // Runs for every successful payment now (full or deposit), this is what
+          // gets the registrant's email attached to their Helcim customer record.
           fetch('/.netlify/functions/helcim-validate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               rawDataResponse: rawDataResponse,
               hash: hash,
-              secretToken: _regSecretToken
+              secretToken: _regSecretToken,
+              email: regGetVal('reg-email'),
+              fullName: regGetVal('reg-first') + ' ' + regGetVal('reg-last')
             })
           })
             .then(function(res) { return res.json(); })
             .then(function(validation) {
+              // Everything below this line is Split-plan only, same as before.
+              if (_regSelectedPlan !== 'deposit') { return; }
               if (APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_URL_HERE') { return; }
 
               var depositData = {
@@ -891,9 +895,10 @@ textarea.input{min-height:90px;resize:vertical}
               fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(depositData) }).catch(function() {});
             })
             .catch(function() {
-              // If validation itself fails to even run, still tell Apps Script a
-              // deposit happened so a human can follow up, just without a
-              // trustworthy card reference for the automatic charge.
+              // If validation itself fails to even run, and this was a Split
+              // payment, still tell Apps Script a deposit happened so a human
+              // can follow up, just without a trustworthy card reference.
+              if (_regSelectedPlan !== 'deposit') { return; }
               if (APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_URL_HERE') { return; }
               fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
                 action: 'recordDeposit',

@@ -18,13 +18,38 @@
  * that, this function does NOT block the registration if the hash fails
  * to match, the payment has already succeeded through Helcim directly by
  * this point regardless of what we do here. A hash mismatch only means:
- * don't trust the customer/card reference for the automatic later charge,
- * flag it for manual follow-up instead. Once we've confirmed real hashes
- * match, this can be tightened if desired.
+ * don't trust the customer/card reference for the automatic later charge
+ * or the email-attach step below, flag it for manual follow-up instead.
+ *
+ * SEP 26 ADDITION — attaching the registrant's email:
+ * helcim-init.js no longer sends an email to Helcim at checkout time
+ * (see that file's comments for why: billingAddress requires a street
+ * address and ZIP, which our registration form doesn't collect, and we
+ * didn't want to ask registrants to type an address twice). Instead,
+ * once a payment succeeds, this function:
+ *   1. Looks up the customer Helcim automatically created, using the
+ *      customerCode from the transaction. That customer record already
+ *      has a billing address, Helcim's own card modal collects one from
+ *      the cardholder for AVS purposes on every payment, regardless of
+ *      what we send at initialize time.
+ *   2. Sends that SAME address back in an Update customer call, adding
+ *      only the email field. Nothing the registrant typed changes,
+ *      we're not fabricating an address, just attaching their email to
+ *      the address Helcim already has on file.
+ * This step is best-effort: if it fails for any reason, we log the error
+ * and move on rather than failing the whole validation, the payment
+ * already succeeded regardless of whether this extra step works.
+ *
+ * NEEDS A REAL TEST: the exact shape of Helcim's "Get customers" search
+ * response (whether it's a bare array or a wrapped { data: [...] } object)
+ * is inferred from documentation examples, not yet confirmed against a
+ * live response. The code below handles both shapes defensively, but
+ * should be watched on the first real test transaction.
  *
  * Endpoint: /.netlify/functions/helcim-validate
  * Method: POST
- * Body: { rawDataResponse: object, hash: string, secretToken: string }
+ * Body: { rawDataResponse: object, hash: string, secretToken: string,
+ *         email: string, fullName: string }
  * Returns: { valid: boolean, customerCode, cardToken, transactionId, amount, status }
  */
 
@@ -49,7 +74,7 @@ exports.handler = async function (event) {
     };
   }
 
-  const { rawDataResponse, hash, secretToken } = body;
+  const { rawDataResponse, hash, secretToken, email } = body;
 
   if (!rawDataResponse || !hash || !secretToken) {
     return {
@@ -57,6 +82,8 @@ exports.handler = async function (event) {
       body: JSON.stringify({ error: 'Missing required fields.' })
     };
   }
+
+  let result;
 
   try {
     // Recompute the hash the same way Helcim does: JSON-encode the
@@ -79,22 +106,15 @@ exports.handler = async function (event) {
       });
     }
 
-    return {
-      statusCode: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': 'https://integratedairwayinstitute.com'
-      },
-      body: JSON.stringify({
-        valid: isValid,
-        transactionId: rawDataResponse.transactionId || '',
-        status: rawDataResponse.status || '',
-        amount: rawDataResponse.amount || '',
-        // Only hand back the customer/card reference if the hash actually
-        // matched, otherwise the caller should treat this as unavailable.
-        customerCode: isValid ? (rawDataResponse.customerCode || '') : '',
-        cardToken: isValid ? (rawDataResponse.cardToken || '') : ''
-      })
+    result = {
+      valid: isValid,
+      transactionId: rawDataResponse.transactionId || '',
+      status: rawDataResponse.status || '',
+      amount: rawDataResponse.amount || '',
+      // Only hand back the customer/card reference if the hash actually
+      // matched, otherwise the caller should treat this as unavailable.
+      customerCode: isValid ? (rawDataResponse.customerCode || '') : '',
+      cardToken: isValid ? (rawDataResponse.cardToken || '') : ''
     };
 
   } catch (err) {
@@ -104,4 +124,83 @@ exports.handler = async function (event) {
       body: JSON.stringify({ error: 'Validation error.' })
     };
   }
+
+  // Best-effort: attach the registrant's email to the customer record
+  // Helcim already created. Never lets a failure here affect the
+  // response above, the payment already succeeded regardless.
+  if (result.valid && result.customerCode && email) {
+    try {
+      await attachEmailToCustomer(result.customerCode, email);
+    } catch (err) {
+      console.error('Could not attach email to customer ' + result.customerCode + ':', err.message);
+    }
+  }
+
+  return {
+    statusCode: 200,
+    headers: {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': 'https://integratedairwayinstitute.com'
+    },
+    body: JSON.stringify(result)
+  };
 };
+
+// ─────────────────────────────────────────────────────────────────────
+// Looks up the customer Helcim auto-created (by customerCode), then
+// updates that same customer with their existing billing address plus
+// the registrant's email. Throws on any failure, caller logs and moves
+// on rather than treating this as fatal.
+// ─────────────────────────────────────────────────────────────────────
+async function attachEmailToCustomer(customerCode, email) {
+  const apiToken = process.env.HELCIM_API_TOKEN;
+  if (!apiToken) {
+    throw new Error('HELCIM_API_TOKEN is not set, cannot attach email.');
+  }
+
+  // Step 1: find the customer's numeric id and existing billing address
+  // using their customerCode.
+  const searchRes = await fetch(
+    'https://api.helcim.com/v2/customers?customerCode=' + encodeURIComponent(customerCode),
+    { headers: { accept: 'application/json', 'api-token': apiToken } }
+  );
+
+  if (!searchRes.ok) {
+    throw new Error('Customer search failed with status ' + searchRes.status);
+  }
+
+  const searchData = await searchRes.json();
+  // Defensive: Helcim's list endpoints have returned either a bare array
+  // or a { data: [...] } wrapper in different examples, handle both.
+  const customer = Array.isArray(searchData)
+    ? searchData[0]
+    : (searchData && Array.isArray(searchData.data) ? searchData.data[0] : null);
+
+  if (!customer || !customer.id) {
+    throw new Error('No customer found for customerCode ' + customerCode);
+  }
+
+  const existingAddress = customer.billingAddress || {};
+
+  // Step 2: update that same customer, keeping their existing
+  // AVS-collected address exactly as Helcim has it, only adding email.
+  // Per Helcim's docs, billingAddress must include name + street1 +
+  // postalCode whenever it's sent, so we send back what's already
+  // there rather than asking the registrant to re-enter anything.
+  const updateRes = await fetch('https://api.helcim.com/v2/customers/' + customer.id, {
+    method: 'PUT',
+    headers: {
+      accept: 'application/json',
+      'api-token': apiToken,
+      'content-type': 'application/json'
+    },
+    body: JSON.stringify({
+      billingAddress: Object.assign({}, existingAddress, { email: email })
+    })
+  });
+
+  if (!updateRes.ok) {
+    const errData = await updateRes.json().catch(function () { return {}; });
+    throw new Error('Update customer failed: ' + JSON.stringify(errData));
+  }
+}
