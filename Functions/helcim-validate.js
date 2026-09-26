@@ -83,6 +83,14 @@ exports.handler = async function (event) {
     };
   }
 
+  // TEMPORARY DIAGNOSTIC LOGGING — added Sep 26 to find out what Helcim's
+  // SUCCESS payload actually contains, since customerCode/cardToken were
+  // assumed field names, never confirmed against a live response. Remove
+  // once confirmed working.
+  console.log('rawDataResponse keys received:', Object.keys(rawDataResponse));
+  console.log('rawDataResponse full content:', JSON.stringify(rawDataResponse));
+  console.log('email present in request body:', !!email);
+
   let result;
 
   try {
@@ -131,9 +139,13 @@ exports.handler = async function (event) {
   if (result.valid && result.customerCode && email) {
     try {
       await attachEmailToCustomer(result.customerCode, email);
+      console.log('Email successfully attached to customer ' + result.customerCode);
     } catch (err) {
       console.error('Could not attach email to customer ' + result.customerCode + ':', err.message);
     }
+  } else {
+    // TEMPORARY DIAGNOSTIC LOGGING — see why this step was skipped.
+    console.log('Email-attach step SKIPPED. valid=' + result.valid + ' customerCode="' + result.customerCode + '" email present=' + !!email);
   }
 
   return {
