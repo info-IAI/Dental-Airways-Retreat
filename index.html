@@ -691,9 +691,6 @@ textarea.input{min-height:90px;resize:vertical}
           document.getElementById('reg-lbl-1').style.color = 'color-mix(in srgb, var(--color-text) 50%, transparent)';
           document.getElementById('reg-lbl-2').style.color = 'var(--color-accent)';
           document.getElementById('reg-panel-2').scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-          /* Pre-fetch checkout token in background so it's ready when they click Pay */
-          regFetchCheckoutToken();
         }
 
         function regGoBack() {
@@ -735,11 +732,8 @@ textarea.input{min-height:90px;resize:vertical}
             // Split plan requires the consent checkbox before the button unlocks
             payBtn.disabled = !consentCheckbox.checked;
           }
-
-          // Plan changed, so any pre-fetched token is for the wrong amount now
-          _regCheckoutToken = null;
-          _regSecretToken = null;
-          regFetchCheckoutToken();
+          // No token prefetch here anymore — regGoToPayment() always fetches a
+          // fresh one at click time instead.
         }
 
         function regOnConsentChange() {
@@ -748,28 +742,6 @@ textarea.input{min-height:90px;resize:vertical}
           if (_regSelectedPlan === 'deposit') {
             payBtn.disabled = !consentCheckbox.checked;
           }
-        }
-
-        function regFetchCheckoutToken() {
-          _regCheckoutToken = null;
-          _regSecretToken = null;
-          fetch('/.netlify/functions/helcim-init', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              planType: _regSelectedPlan,
-              fullName: regGetVal('reg-first') + ' ' + regGetVal('reg-last'),
-              email: regGetVal('reg-email')
-            })
-          })
-            .then(function(res) { return res.json(); })
-            .then(function(data) {
-              if (data.checkoutToken) {
-                _regCheckoutToken = data.checkoutToken;
-                _regSecretToken = data.secretToken;
-              }
-            })
-            .catch(function() { /* silent — will retry on click */ });
         }
 
         function regSetPayBtn(loading) {
@@ -809,34 +781,30 @@ textarea.input{min-height:90px;resize:vertical}
             fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formData) }).catch(function() {});
           }
 
-          if (_regCheckoutToken) {
-            regLaunchHelcimModal(_regCheckoutToken);
-          } else {
-            regSetPayBtn(true);
-            fetch('/.netlify/functions/helcim-init', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                planType: _regSelectedPlan,
-                fullName: regGetVal('reg-first') + ' ' + regGetVal('reg-last'),
-                email: regGetVal('reg-email')
-              })
+          regSetPayBtn(true);
+          fetch('/.netlify/functions/helcim-init', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              planType: _regSelectedPlan,
+              fullName: regGetVal('reg-first') + ' ' + regGetVal('reg-last'),
+              email: regGetVal('reg-email')
             })
-              .then(function(res) { return res.json(); })
-              .then(function(data) {
-                regSetPayBtn(false);
-                if (data.checkoutToken) {
-                  _regSecretToken = data.secretToken;
-                  regLaunchHelcimModal(data.checkoutToken);
-                } else {
-                  regShowPayError(data.error || 'Unable to initialize payment. Please try again or email info@integratedairwayinstitute.com.');
-                }
-              })
-              .catch(function() {
-                regSetPayBtn(false);
-                regShowPayError('Unable to reach payment service. Please check your connection and try again, or email info@integratedairwayinstitute.com.');
-              });
-          }
+          })
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+              regSetPayBtn(false);
+              if (data.checkoutToken) {
+                _regSecretToken = data.secretToken;
+                regLaunchHelcimModal(data.checkoutToken);
+              } else {
+                regShowPayError(data.error || 'Unable to initialize payment. Please try again or email info@integratedairwayinstitute.com.');
+              }
+            })
+            .catch(function() {
+              regSetPayBtn(false);
+              regShowPayError('Unable to reach payment service. Please check your connection and try again, or email info@integratedairwayinstitute.com.');
+            });
         }
 
         function regLaunchHelcimModal(checkoutToken) {
@@ -850,9 +818,6 @@ textarea.input{min-height:90px;resize:vertical}
                 regShowConfirmation();
               } else if (event.data.eventStatus === 'ABORTED' || event.data.eventStatus === 'HIDE') {
                 regShowPayError('Payment was cancelled. You can try again below.');
-                _regCheckoutToken = null;
-                _regSecretToken = null;
-                regFetchCheckoutToken();
               }
             }
           });
