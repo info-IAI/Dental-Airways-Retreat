@@ -65,6 +65,14 @@ exports.handler = async function (event) {
     };
   }
 
+  // Same key for every attempt at the same balance charge, so Helcim rejects
+  // a repeat if an earlier attempt went through but its response was lost.
+  const idempotencyKey = crypto
+    .createHash('sha256')
+    .update((body.customerCode || '') + body.cardToken + body.amount)
+    .digest('hex')
+    .slice(0, 25);
+
   try {
     const response = await fetch('https://api.helcim.com/v2/payment/purchase', {
       method: 'POST',
@@ -72,7 +80,7 @@ exports.handler = async function (event) {
         'accept': 'application/json',
         'api-token': apiToken,
         'content-type': 'application/json',
-        'idempotency-key': crypto.randomBytes(16).toString('hex').slice(0, 25)
+        'idempotency-key': idempotencyKey
       },
       body: JSON.stringify({
         amount: body.amount,
