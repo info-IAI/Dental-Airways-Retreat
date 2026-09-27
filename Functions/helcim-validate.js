@@ -74,14 +74,10 @@ exports.handler = async function (event) {
     };
   }
 
-  // TEMPORARY DIAGNOSTIC LOGGING — moved above the missing-fields check,
-  // since the last test returned in ~4ms with nothing logged, meaning it
-  // was very likely exiting AT that check, before reaching any logging.
-  // This placement guarantees we see the raw request no matter what.
-  console.log('helcim-validate raw body received:', JSON.stringify(body));
-
   const { rawDataResponse, hash, secretToken, email } = body;
 
+  // TEMPORARY DIAGNOSTIC LOGGING — presence only, never values (the body
+  // carries secretToken and, inside rawDataResponse, the cardToken).
   console.log('Parsed: rawDataResponse present=' + !!rawDataResponse + ' hash present=' + !!hash + ' secretToken present=' + !!secretToken + ' email present=' + !!email);
 
   if (!rawDataResponse || !hash || !secretToken) {
@@ -97,7 +93,6 @@ exports.handler = async function (event) {
   // assumed field names, never confirmed against a live response. Remove
   // once confirmed working.
   console.log('rawDataResponse keys received:', Object.keys(rawDataResponse));
-  console.log('rawDataResponse full content:', JSON.stringify(rawDataResponse));
   console.log('email present in request body:', !!email);
 
   let result;
@@ -148,13 +143,13 @@ exports.handler = async function (event) {
   if (result.valid && result.customerCode && email) {
     try {
       await attachEmailToCustomer(result.customerCode, email);
-      console.log('Email successfully attached to customer ' + result.customerCode);
+      console.log('Email successfully attached to customer record.');
     } catch (err) {
       console.error('Could not attach email to customer ' + result.customerCode + ':', err.message);
     }
   } else {
     // TEMPORARY DIAGNOSTIC LOGGING — see why this step was skipped.
-    console.log('Email-attach step SKIPPED. valid=' + result.valid + ' customerCode="' + result.customerCode + '" email present=' + !!email);
+    console.log('Email-attach step SKIPPED. valid=' + result.valid + ' customerCode present=' + !!result.customerCode + ' email present=' + !!email);
   }
 
   return {

@@ -598,7 +598,7 @@ textarea.input{min-height:90px;resize:vertical}
           </div>
 
           <div style="border: 1px solid color-mix(in srgb, var(--color-accent) 35%, transparent); border-radius: 8px; padding: 16px 20px; margin-bottom: 24px; font-size: 14px; color: color-mix(in srgb, var(--color-text) 78%, transparent); background: color-mix(in srgb, var(--color-accent) 7%, transparent)">
-            Complete your $6,100 registration securely by credit card or ACH bank transfer. Your information has already been saved. A seat confirmation email will follow once payment clears.
+            Complete your <span id="reg-due-amount">$6,100</span> registration securely by credit card or ACH bank transfer. Your information has already been saved. A seat confirmation email will follow once payment clears.
           </div>
 
           <!-- Payment error message -->
@@ -677,7 +677,7 @@ textarea.input{min-height:90px;resize:vertical}
           ];
           var html = rows.map(function(r) {
             return '<div class="summary-row"><span class="slabel">' + r.label + '</span><span class="svalue">' + r.value + '</span></div>';
-          }).join('') + '<div class="summary-total"><span class="slabel">Total due</span><span class="svalue">$6,100</span></div>';
+          }).join('') + '<div class="summary-total"><span class="slabel">Total due</span><span class="svalue" id="reg-summary-total">' + regPlanAmount() + '</span></div>';
           document.getElementById('reg-summary').innerHTML = html;
 
           document.getElementById('reg-panel-1').style.display = 'none';
@@ -708,6 +708,14 @@ textarea.input{min-height:90px;resize:vertical}
           _regCheckoutToken = null;
         }
 
+        function regPlanAmount() {
+          return _regSelectedPlan === 'deposit' ? '$3,050' : '$6,100';
+        }
+
+        function regPayBtnText() {
+          return _regSelectedPlan === 'deposit' ? 'Pay $3,050 now — credit card or ACH' : 'Pay $6,100 — credit card or ACH';
+        }
+
         function regSelectPlan(planType) {
           _regSelectedPlan = planType;
 
@@ -722,16 +730,17 @@ textarea.input{min-height:90px;resize:vertical}
             fullBtn.classList.add('plan-selected');
             depositBtn.classList.remove('plan-selected');
             consentBox.style.display = 'none';
-            payBtnLabel.textContent = 'Pay $6,100 — credit card or ACH';
             payBtn.disabled = false;
           } else {
             depositBtn.classList.add('plan-selected');
             fullBtn.classList.remove('plan-selected');
             consentBox.style.display = 'block';
-            payBtnLabel.textContent = 'Pay $3,050 now — credit card or ACH';
             // Split plan requires the consent checkbox before the button unlocks
             payBtn.disabled = !consentCheckbox.checked;
           }
+          payBtnLabel.textContent = regPayBtnText();
+          document.getElementById('reg-due-amount').textContent = regPlanAmount();
+          document.getElementById('reg-summary-total').textContent = regPlanAmount();
           // No token prefetch here anymore — regGoToPayment() always fetches a
           // fresh one at click time instead.
         }
@@ -748,7 +757,7 @@ textarea.input{min-height:90px;resize:vertical}
           var btn = document.getElementById('reg-pay-btn');
           var lbl = document.getElementById('reg-pay-btn-label');
           btn.disabled = loading;
-          lbl.textContent = loading ? 'Opening payment…' : 'Pay $6,100 — credit card or ACH';
+          lbl.textContent = loading ? 'Opening payment…' : regPayBtnText();
         }
 
         function regShowPayError(msg) {
