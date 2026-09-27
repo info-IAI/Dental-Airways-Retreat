@@ -18,6 +18,8 @@
  * Returns: { success: boolean, transactionId, status, error }
  */
 
+const crypto = require('crypto');
+
 exports.handler = async function (event) {
 
   if (event.httpMethod !== 'POST') {
@@ -69,7 +71,8 @@ exports.handler = async function (event) {
       headers: {
         'accept': 'application/json',
         'api-token': apiToken,
-        'content-type': 'application/json'
+        'content-type': 'application/json',
+        'idempotency-key': crypto.randomBytes(16).toString('hex').slice(0, 25)
       },
       body: JSON.stringify({
         amount: body.amount,

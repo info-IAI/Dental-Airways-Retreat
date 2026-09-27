@@ -677,7 +677,7 @@ textarea.input{min-height:90px;resize:vertical}
           ];
           var html = rows.map(function(r) {
             return '<div class="summary-row"><span class="slabel">' + r.label + '</span><span class="svalue">' + r.value + '</span></div>';
-          }).join('') + '<div class="summary-total"><span class="slabel">Total due</span><span class="svalue" id="reg-summary-total">' + regPlanAmount() + '</span></div>';
+          }).join('') + '<div class="summary-total"><span class="slabel" id="reg-summary-label">' + regSummaryLabel() + '</span><span class="svalue" id="reg-summary-total">' + regPlanAmount() + '</span></div>';
           document.getElementById('reg-summary').innerHTML = html;
 
           document.getElementById('reg-panel-1').style.display = 'none';
@@ -712,6 +712,10 @@ textarea.input{min-height:90px;resize:vertical}
           return _regSelectedPlan === 'deposit' ? '$3,050' : '$6,100';
         }
 
+        function regSummaryLabel() {
+          return _regSelectedPlan === 'deposit' ? 'Due today' : 'Total due';
+        }
+
         function regPayBtnText() {
           return _regSelectedPlan === 'deposit' ? 'Pay $3,050 now — credit card or ACH' : 'Pay $6,100 — credit card or ACH';
         }
@@ -740,6 +744,7 @@ textarea.input{min-height:90px;resize:vertical}
           }
           payBtnLabel.textContent = regPayBtnText();
           document.getElementById('reg-due-amount').textContent = regPlanAmount();
+          document.getElementById('reg-summary-label').textContent = regSummaryLabel();
           document.getElementById('reg-summary-total').textContent = regPlanAmount();
           // No token prefetch here anymore — regGoToPayment() always fetches a
           // fresh one at click time instead.
