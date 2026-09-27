@@ -76,24 +76,13 @@ exports.handler = async function (event) {
 
   const { rawDataResponse, hash, secretToken, email } = body;
 
-  // TEMPORARY DIAGNOSTIC LOGGING — presence only, never values (the body
-  // carries secretToken and, inside rawDataResponse, the cardToken).
-  console.log('Parsed: rawDataResponse present=' + !!rawDataResponse + ' hash present=' + !!hash + ' secretToken present=' + !!secretToken + ' email present=' + !!email);
-
   if (!rawDataResponse || !hash || !secretToken) {
-    console.log('EXITING EARLY: missing required fields, see above for what was actually received.');
+    console.log('EXITING EARLY: missing required fields.');
     return {
       statusCode: 400,
       body: JSON.stringify({ error: 'Missing required fields.' })
     };
   }
-
-  // TEMPORARY DIAGNOSTIC LOGGING — added Sep 26 to find out what Helcim's
-  // SUCCESS payload actually contains, since customerCode/cardToken were
-  // assumed field names, never confirmed against a live response. Remove
-  // once confirmed working.
-  console.log('rawDataResponse keys received:', Object.keys(rawDataResponse));
-  console.log('email present in request body:', !!email);
 
   let result;
 
@@ -147,9 +136,6 @@ exports.handler = async function (event) {
     } catch (err) {
       console.error('Could not attach email to customer ' + result.customerCode + ':', err.message);
     }
-  } else {
-    // TEMPORARY DIAGNOSTIC LOGGING — see why this step was skipped.
-    console.log('Email-attach step SKIPPED. valid=' + result.valid + ' customerCode present=' + !!result.customerCode + ' email present=' + !!email);
   }
 
   return {
