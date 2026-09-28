@@ -601,7 +601,7 @@ textarea.input{min-height:90px;resize:vertical}
           <div id="reg-consent-box" style="display: none; border: 1px solid color-mix(in srgb, var(--color-accent) 35%, transparent); border-radius: 8px; padding: 16px 18px; margin-bottom: 24px; background: color-mix(in srgb, var(--color-accent) 6%, transparent)">
             <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer; font-size: 13px; line-height: 1.6; color: color-mix(in srgb, var(--color-text) 80%, transparent)">
               <input type="checkbox" id="reg-consent-checkbox" onchange="regOnConsentChange()" style="margin-top: 3px; flex-shrink: 0">
-              <span>By selecting Split Payment, you authorize Integrated Airway Institute to automatically charge the remaining balance of $3,050 to the payment method used today. This charge will occur on or shortly after February 11, 2027, if the balance has not already been paid. This automatic charge is non-refundable, per our Cancellation &amp; Refund Policy. If your payment method changes before then, please contact us at info@integratedairwayinstitute.com.</span>
+              <span>By selecting Split Payment, you authorize Integrated Airway Institute to automatically charge the remaining balance of $3,050 to the payment method used today. This charge will occur on or shortly after February 11, 2027, if the balance has not already been paid. If your payment method changes before then, please contact us at info@integratedairwayinstitute.com.</span>
             </label>
           </div>
 
@@ -856,6 +856,7 @@ textarea.input{min-height:90px;resize:vertical}
                   regValidateAndRecordDeposit(parsedEventMessage.data, parsedEventMessage.hash);
                 } else {
                   console.error('Could not parse Helcim SUCCESS eventMessage:', event.data.eventMessage);
+                  regSendDepositFallback();
                 }
                 regShowConfirmation();
               } else if (event.data.eventStatus === 'ABORTED' || event.data.eventStatus === 'HIDE') {
@@ -905,18 +906,24 @@ textarea.input{min-height:90px;resize:vertical}
               // If validation itself fails to even run, and this was a Split
               // payment, still tell Apps Script a deposit happened so a human
               // can follow up, just without a trustworthy card reference.
-              if (_regSelectedPlan !== 'deposit') { return; }
-              if (APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_URL_HERE') { return; }
-              fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
-                action: 'recordDeposit',
-                'Email Address': regGetVal('reg-email'),
-                'Balance Due': 3050,
-                'Balance Due Date': '2027-02-11',
-                'Customer Code': '',
-                'Card Token': '',
-                'Validation Passed': false
-              }) }).catch(function() {});
+              regSendDepositFallback();
             });
+        }
+
+        function regSendDepositFallback() {
+          // Split plan only: record the deposit without a card reference,
+          // which flags it in Apps Script for manual follow-up.
+          if (_regSelectedPlan !== 'deposit') { return; }
+          if (APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_URL_HERE') { return; }
+          fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+            action: 'recordDeposit',
+            'Email Address': regGetVal('reg-email'),
+            'Balance Due': 3050,
+            'Balance Due Date': '2027-02-11',
+            'Customer Code': '',
+            'Card Token': '',
+            'Validation Passed': false
+          }) }).catch(function() {});
         }
 
         function regShowConfirmation() {
