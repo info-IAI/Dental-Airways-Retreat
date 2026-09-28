@@ -1,5 +1,16 @@
 #!/usr/bin/env node
 /**
+ * WARNING — DO NOT RUN THIS SCRIPT UNTIL REGISTER_SECTION IS UPDATED.
+ * The #register template embedded below (REGISTER_SECTION) predates the
+ * split-payment checkout work. Step 7 replaces the live #register section
+ * with it, which removes the plan picker, consent box, and payment
+ * validation code, and brings back the old helcim-init call with no
+ * planType, so every Pay click would fail. Update REGISTER_SECTION to
+ * match the current #register section in index.html before running this
+ * script again.
+ */
+
+/**
  * IAI Deploy Prep Script
  * ----------------------
  * Run this after every Claude Design export to produce a clean,
@@ -508,6 +519,26 @@ html = html.replace(
   '<link rel="icon" type="image/png" href="uploads/IAI_logo_centered.png">'
 );
 changes.push('Updated favicon to IAI_logo_centered.png');
+
+// Add Google Analytics (GA4) as the first thing inside <head>, only once
+const GA_MEASUREMENT_ID = 'G-YFP81ZD32Z';
+const GA_SNIPPET = `<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', '${GA_MEASUREMENT_ID}');
+</script>`;
+const headOpenTag = /<head(\s[^>]*)?>/i;
+if (html.includes('googletagmanager.com/gtag/js?id=' + GA_MEASUREMENT_ID)) {
+  changes.push('Google Analytics tag already present — not added again');
+} else if (headOpenTag.test(html)) {
+  html = html.replace(headOpenTag, match => match + '\n' + GA_SNIPPET);
+  changes.push('Added Google Analytics tag (' + GA_MEASUREMENT_ID + ') at the top of <head>');
+} else {
+  console.warn('WARNING: no <head> tag found — Google Analytics tag NOT added.');
+}
 
 // 10. Write output
 fs.writeFileSync(OUTPUT, html, 'utf8');
