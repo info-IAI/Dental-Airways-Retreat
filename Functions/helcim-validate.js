@@ -74,7 +74,7 @@ exports.handler = async function (event) {
     };
   }
 
-  const { rawDataResponse, hash, secretToken, email } = body;
+  const { rawDataResponse, hash, secretToken, email, fullName } = body;
 
   if (!rawDataResponse || !hash || !secretToken) {
     console.log('EXITING EARLY: missing required fields.');
@@ -131,7 +131,7 @@ exports.handler = async function (event) {
   // response above, the payment already succeeded regardless.
   if (result.valid && result.customerCode && email) {
     try {
-      await attachEmailToCustomer(result.customerCode, email);
+      await attachEmailToCustomer(result.customerCode, email, fullName);
       console.log('Email successfully attached to customer record.');
     } catch (err) {
       console.error('Could not attach email to customer ' + result.customerCode + ':', err.message);
@@ -154,7 +154,7 @@ exports.handler = async function (event) {
 // the registrant's email. Throws on any failure, caller logs and moves
 // on rather than treating this as fatal.
 // ─────────────────────────────────────────────────────────────────────
-async function attachEmailToCustomer(customerCode, email) {
+async function attachEmailToCustomer(customerCode, email, fullName) {
   // Prefers HELCIM_API_TOKEN_TEST (set only on Deploy Previews in Netlify)
   // so preview/test runs never touch the live Helcim account.
   const apiToken = process.env.HELCIM_API_TOKEN_TEST || process.env.HELCIM_API_TOKEN;
@@ -206,6 +206,21 @@ async function attachEmailToCustomer(customerCode, email) {
 
   cleanAddress.email = email;
 
+  // Helcim also requires a contactName or businessName at the top level.
+  const updateBody = {};
+  if (typeof customer.contactName === 'string' && customer.contactName.trim() !== '') {
+    updateBody.contactName = customer.contactName;
+  } else if (typeof fullName === 'string' && fullName.trim() !== '') {
+    updateBody.contactName = fullName.trim();
+  }
+  if (typeof customer.businessName === 'string' && customer.businessName.trim() !== '') {
+    updateBody.businessName = customer.businessName;
+  }
+  if (!updateBody.contactName && !updateBody.businessName) {
+    throw new Error('Cannot attach email: no contact name or business name available');
+  }
+  updateBody.billingAddress = cleanAddress;
+
   // Step 2: update that same customer, keeping the non-empty fields of
   // their existing AVS-collected address, only adding email.
   // Per Helcim's docs, billingAddress must include name + street1 +
@@ -218,9 +233,7 @@ async function attachEmailToCustomer(customerCode, email) {
       'api-token': apiToken,
       'content-type': 'application/json'
     },
-    body: JSON.stringify({
-      billingAddress: cleanAddress
-    })
+    body: JSON.stringify(updateBody)
   });
 
   if (!updateRes.ok) {
