@@ -155,7 +155,9 @@ exports.handler = async function (event) {
 // on rather than treating this as fatal.
 // ─────────────────────────────────────────────────────────────────────
 async function attachEmailToCustomer(customerCode, email) {
-  const apiToken = process.env.HELCIM_API_TOKEN;
+  // Prefers HELCIM_API_TOKEN_TEST (set only on Deploy Previews in Netlify)
+  // so preview/test runs never touch the live Helcim account.
+  const apiToken = process.env.HELCIM_API_TOKEN_TEST || process.env.HELCIM_API_TOKEN;
   if (!apiToken) {
     throw new Error('HELCIM_API_TOKEN is not set, cannot attach email.');
   }
