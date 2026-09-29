@@ -852,10 +852,27 @@ textarea.input{min-height:90px;resize:vertical}
                   parsedEventMessage = null;
                 }
 
-                if (parsedEventMessage && parsedEventMessage.data && parsedEventMessage.hash) {
-                  regValidateAndRecordDeposit(parsedEventMessage.data, parsedEventMessage.hash);
+                var rawData = null;
+                var hash = null;
+                if (parsedEventMessage && parsedEventMessage.data) {
+                  if (parsedEventMessage.data.hash && parsedEventMessage.data.data) {
+                    // Shape seen on real test payments: { data: { hash, data: {...} }, status, headers }
+                    rawData = parsedEventMessage.data.data;
+                    hash = parsedEventMessage.data.hash;
+                  } else if (parsedEventMessage.hash) {
+                    // Shape in Helcim's docs: { data: {...}, hash }
+                    rawData = parsedEventMessage.data;
+                    hash = parsedEventMessage.hash;
+                  }
+                }
+
+                if (rawData && hash) {
+                  regValidateAndRecordDeposit(rawData, hash);
                 } else {
-                  console.error('Could not parse Helcim SUCCESS eventMessage:', event.data.eventMessage);
+                  // Key names only, never values: the message carries the card token and hash.
+                  var topKeys = (parsedEventMessage && typeof parsedEventMessage === 'object') ? Object.keys(parsedEventMessage) : [];
+                  var dataKeys = (parsedEventMessage && parsedEventMessage.data && typeof parsedEventMessage.data === 'object') ? Object.keys(parsedEventMessage.data) : [];
+                  console.error('Could not read Helcim SUCCESS eventMessage. Top-level keys: [' + topKeys.join(', ') + '], data keys: [' + dataKeys.join(', ') + ']');
                   regSendDepositFallback();
                 }
                 regShowConfirmation();
