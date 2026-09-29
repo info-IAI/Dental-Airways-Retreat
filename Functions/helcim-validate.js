@@ -186,8 +186,28 @@ async function attachEmailToCustomer(customerCode, email) {
 
   const existingAddress = customer.billingAddress || {};
 
-  // Step 2: update that same customer, keeping their existing
-  // AVS-collected address exactly as Helcim has it, only adding email.
+  // Helcim's update endpoint rejects empty fields (e.g. a blank phone),
+  // so only the fields that actually have a value are sent back.
+  const cleanAddress = {};
+  Object.keys(existingAddress).forEach(function (key) {
+    const value = existingAddress[key];
+    if (value === null || value === undefined) return;
+    if (typeof value === 'string' && value.trim() === '') return;
+    cleanAddress[key] = value;
+  });
+
+  // Names the missing keys only, never address values.
+  const missing = ['name', 'street1', 'postalCode'].filter(function (key) {
+    return !(key in cleanAddress);
+  });
+  if (missing.length) {
+    throw new Error('Cannot attach email: billing address is missing ' + missing.join(', '));
+  }
+
+  cleanAddress.email = email;
+
+  // Step 2: update that same customer, keeping the non-empty fields of
+  // their existing AVS-collected address, only adding email.
   // Per Helcim's docs, billingAddress must include name + street1 +
   // postalCode whenever it's sent, so we send back what's already
   // there rather than asking the registrant to re-enter anything.
@@ -199,7 +219,7 @@ async function attachEmailToCustomer(customerCode, email) {
       'content-type': 'application/json'
     },
     body: JSON.stringify({
-      billingAddress: Object.assign({}, existingAddress, { email: email })
+      billingAddress: cleanAddress
     })
   });
 
